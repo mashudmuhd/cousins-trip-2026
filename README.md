@@ -32,6 +32,3 @@ The joined list exposes family names, phones, and age groups to anyone allowed t
 
 Serve `dist` using any static HTTP server. Open the served URL in your browser. Opening the HTML directly as a file may prevent remote requests.
 
-## Image attribution
-
-Forest photo: T. R. Shankar Raman / Wikimedia Commons. Source: https://commons.wikimedia.org/wiki/File:KMTR_rainforest_canopy.jpg . Licensed CC BY 4.0: https://creativecommons.org/licenses/by/4.0/ . Resized, cropped and darkened in the interface. No claim of endorsement.
