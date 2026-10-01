@@ -31,10 +31,10 @@ function payload(r){const adultCount=r.members.filter(m=>m.type==='adult').lengt
 async function post(r){const result=await network.write(payload(r));if(result.status==='duplicate'||result.code==='DUPLICATE')return {duplicate:true,data:result.data};if(result.status!=='success'&&result.success!==true)throw Error(result.message||'Registration sync could not be confirmed');return result;}
 async function sync(retry=false){if(syncing||saving)return;syncing=true;$('#refresh').disabled=true;$('#sync-status').textContent='Refreshing…';$('#sync-status').classList.remove('live');if(!hasLiveSnapshot&&!records.length){$('#joined-list').innerHTML='<div class="card empty" role="status">Loading families from Google Sheets…</div>';}try{mergeRemote(await getRemote());if(retry&&records.some(r=>r.pending)){for(const r of records.filter(r=>r.pending)){await post(r);}mergeRemote(await getRemote());}const pending=records.some(r=>r.pending);$('#sync-status').textContent=pending?'Waiting to sync':'Live sync';$('#sync-status').classList.toggle('live',!pending);$('#list-message').textContent='Updated from Google Sheets · '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});}catch{$('#sync-status').textContent='Could not refresh · cached data';$('#list-message').textContent='Could not refresh the family list. Your saved entries are still here. Tap Refresh to try again.';if(!hasLiveSnapshot&&!records.length){$('#joined-list').innerHTML='<div class="card empty">The family list could not be loaded. Tap Refresh to try again.</div>';}}finally{syncing=false;$('#refresh').disabled=false;}}
 $('#refresh').onclick=()=>sync(true);
-function whatsapp(r){const text=`🌴 *കാട്ടിലെ കുട്ടികൾ COUSINS TRIP 2026* 🌴\n--------------------------------\n*ആകെ അംഗങ്ങൾ (Total):* ${r.members.length}\n*Phone:* ${r.phone}\n\n*അംഗങ്ങളുടെ വിവരങ്ങൾ (Members List):*\n${r.members.map((m,i)=>`${i+1}. *${m.name}* - ${labels[m.type]}`).join('\n')}\n\n*Status:* Confirmed (രജിസ്ട്രേഷൻ പൂർത്തിയായി) ✅`;const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);return (mobile?'whatsapp://send?phone=919946290209&text=':'https://web.whatsapp.com/send?phone=919946290209&text=')+encodeURIComponent(text);}
+
 function notify(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('#toast').hidden=true,7000);}
 function confetti(){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;for(let i=0;i<64;i++){const c=document.createElement('i');c.className='confetti';const left=i%2===0;c.style.left=left?'0':'100%';c.style.top='65%';c.style.background=['#62edb1','#0bbad4','#e7c372','#edf9ef'][i%4];c.style.setProperty('--dx',`${(left?1:-1)*(80+Math.random()*innerWidth*.55)}px`);c.style.setProperty('--dy',`${-400+Math.random()*650}px`);document.body.append(c);setTimeout(()=>c.remove(),2000);}}
-let tripAnimation,progressTimer;
+let tripAnimation,progressTimer,confirmedTicket;
 function showProgress(){
   const dialog=$('#trip-dialog');dialog.classList.remove('is-ticket');$('#ticket-brand').hidden=true;
   $('#trip-close').hidden=true;$('#trip-actions').hidden=true;$('#trip-details').hidden=true;$('#trip-success').hidden=true;$('#trip-progress').hidden=false;$('#trip-wait-note').hidden=false;
@@ -50,8 +50,15 @@ function showWelcome(r){
   $('#trip-dialog-title').textContent='Welcome to the trip!';$('#trip-dialog-description').textContent='ഒരുമിച്ച് ഒരു യാത്ര. ഒരുപാട് ഓർമ്മകൾ.';
   const adults=r.members.filter(m=>m.type==='adult').length;
   $('#trip-details').innerHTML=`<div class="ticket-holder"><span class="ticket-label">FAMILY / കുടുംബം</span><strong>${escapeHtml(r.familyHead)}</strong></div><div class="ticket-grid"><div><span class="ticket-label">TRAVELLERS</span><strong>${String(r.members.length).padStart(2,'0')} <small>members</small></strong></div><div><span class="ticket-label">YOUR GROUP</span><strong>${adults} <small>adults</small> · ${r.members.length-adults} <small>kids</small></strong></div></div><div class="ticket-stub"><div><span class="ticket-label">TICKET NUMBER</span><strong>${escapeHtml(r.ticketId)}</strong></div><span class="ticket-confirmed">✓ Confirmed</span></div>`;$('#trip-details').hidden=false;
-  $('#trip-whatsapp').href=whatsapp(r);$('#trip-actions').hidden=false;$('#trip-close').hidden=false;$('#trip-wait-note').hidden=true;$('#trip-dialog-title').focus();
+  confirmedTicket=JSON.parse(JSON.stringify(r));$('#trip-actions').hidden=false;$('#trip-close').hidden=false;$('#trip-wait-note').hidden=true;$('#trip-dialog-title').focus();
 }
+$('#trip-download').onclick=async()=>{
+  if(!confirmedTicket)return;
+  const button=$('#trip-download'),label=button.querySelector('span');button.disabled=true;label.textContent='Preparing your PDF…';
+  try{const result=await window.createTicketPDF(confirmedTicket);await result.pdf.save(result.filename,{returnPromise:true});}
+  catch{notify('Could not download the PDF. Please try again.');}
+  finally{button.disabled=false;label.innerHTML='Download Ticket<small>Save your trip pass as PDF</small>';}
+};
 $('#trip-dialog').addEventListener('cancel',e=>{if(saving)e.preventDefault();});
 $('#trip-dialog').addEventListener('close',endProgress);
 $('#trip-close').onclick=$('#trip-done').onclick=()=>{$('#trip-dialog').close();switchTab(true,true);};
