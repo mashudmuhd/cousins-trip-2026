@@ -34,7 +34,7 @@ $('#refresh').onclick=()=>sync(true);
 
 function notify(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('#toast').hidden=true,7000);}
 function confetti(){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;for(let i=0;i<64;i++){const c=document.createElement('i');c.className='confetti';const left=i%2===0;c.style.left=left?'0':'100%';c.style.top='65%';c.style.background=['#62edb1','#0bbad4','#e7c372','#edf9ef'][i%4];c.style.setProperty('--dx',`${(left?1:-1)*(80+Math.random()*innerWidth*.55)}px`);c.style.setProperty('--dy',`${-400+Math.random()*650}px`);document.body.append(c);setTimeout(()=>c.remove(),2000);}}
-let tripAnimation,progressTimer,confirmedTicket;
+let tripAnimation,progressTimer,confirmedTicket,ticketExportPromise,ticketImageFile;
 function showProgress(){
   const dialog=$('#trip-dialog');dialog.classList.remove('is-ticket');$('#ticket-brand').hidden=true;
   $('#trip-close').hidden=true;$('#trip-actions').hidden=true;$('#trip-details').hidden=true;$('#trip-success').hidden=true;$('#trip-progress').hidden=false;$('#trip-wait-note').hidden=false;
@@ -50,12 +50,37 @@ function showWelcome(r){
   $('#trip-dialog-title').textContent='Welcome to the trip!';$('#trip-dialog-description').textContent='ഒരുമിച്ച് ഒരു യാത്ര. ഒരുപാട് ഓർമ്മകൾ.';
   const adults=r.members.filter(m=>m.type==='adult').length;
   $('#trip-details').innerHTML=`<div class="ticket-holder"><span class="ticket-label">FAMILY / കുടുംബം</span><strong>${escapeHtml(r.familyHead)}</strong></div><div class="ticket-grid"><div><span class="ticket-label">TRAVELLERS</span><strong>${String(r.members.length).padStart(2,'0')} <small>members</small></strong></div><div><span class="ticket-label">YOUR GROUP</span><strong>${adults} <small>adults</small> · ${r.members.length-adults} <small>kids</small></strong></div></div><div class="ticket-stub"><div><span class="ticket-label">TICKET NUMBER</span><strong>${escapeHtml(r.ticketId)}</strong></div><span class="ticket-confirmed">✓ Confirmed</span></div>`;$('#trip-details').hidden=false;
-  confirmedTicket=JSON.parse(JSON.stringify(r));$('#trip-actions').hidden=false;$('#trip-close').hidden=false;$('#trip-wait-note').hidden=true;$('#trip-dialog-title').focus();
+  confirmedTicket=JSON.parse(JSON.stringify(r));prepareTicketImage();$('#trip-actions').hidden=false;$('#trip-close').hidden=false;$('#trip-wait-note').hidden=true;$('#trip-dialog-title').focus();
 }
+function prepareTicketImage(){
+  ticketImageFile=null;
+  const button=$('#trip-share-image');button.disabled=true;button.querySelector('span').textContent='Preparing ticket image…';$('#ticket-share-status').textContent='';
+  const snapshot=confirmedTicket;
+  ticketExportPromise=window.createTicketPDF(snapshot);
+  ticketExportPromise.then(async result=>{
+    const blob=await new Promise((resolve,reject)=>result.canvas.toBlob(value=>value?resolve(value):reject(Error('Image export failed')),'image/png'));
+    if(confirmedTicket!==snapshot)return;
+    ticketImageFile=new File([blob],result.filename.replace(/\.pdf$/i,'.png'),{type:'image/png'});
+    button.disabled=false;button.querySelector('span').textContent='Share ticket image';
+    $('#ticket-share-status').textContent=navigator.canShare?.({files:[ticketImageFile]})?'Choose WhatsApp in your phone’s share menu.':'Your browser can save the image to attach in WhatsApp.';
+  }).catch(()=>{if(confirmedTicket!==snapshot)return;ticketExportPromise=null;button.disabled=false;button.querySelector('span').textContent='Retry ticket image';$('#ticket-share-status').textContent='Image preparation failed. Tap to retry.';});
+}
+function saveTicketImage(){
+  const url=URL.createObjectURL(ticketImageFile),link=document.createElement('a');link.href=url;link.download=ticketImageFile.name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+  $('#ticket-share-status').textContent='Ticket PNG saved. Open WhatsApp and attach it from Photos or Files.';
+}
+$('#trip-share-image').onclick=async()=>{
+  if(!ticketImageFile){if(confirmedTicket)prepareTicketImage();return;}
+  // The file is prepared before the tap, preserving the browser's share permission.
+  if(navigator.share&&navigator.canShare?.({files:[ticketImageFile]})){
+    try{await navigator.share({files:[ticketImageFile],title:'Cousins Trip 2026 ticket'});$('#ticket-share-status').textContent='';}
+    catch(error){if(error.name!=='AbortError'){$('#ticket-share-status').textContent='Image sharing is unavailable. Saving the ticket so you can attach it in WhatsApp.';saveTicketImage();}}
+  }else saveTicketImage();
+};
 $('#trip-download').onclick=async()=>{
   if(!confirmedTicket)return;
   const button=$('#trip-download'),label=button.querySelector('span');button.disabled=true;label.textContent='Preparing your PDF…';
-  try{const result=await window.createTicketPDF(confirmedTicket);await result.pdf.save(result.filename,{returnPromise:true});}
+  try{const result=await (ticketExportPromise||window.createTicketPDF(confirmedTicket));await result.pdf.save(result.filename,{returnPromise:true});}
   catch{notify('Could not download the PDF. Please try again.');}
   finally{button.disabled=false;label.innerHTML='Download Ticket<small>Save your trip pass as PDF</small>';}
 };
