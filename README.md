@@ -14,9 +14,9 @@ A mobile-first, bilingual registration app built with HTML, CSS and JavaScript. 
 
 The supplied endpoint was verified to return `status: success` and registrations in `data`, including `membersList`. The frontend sends compatible fields: ticketId, familyHead, phone, totalCount, adultCount, kid8to15Count, kidBelow8Count, membersSummary, membersList. Its POST handler has not been inspected or replaced. A live test registration has not been added to your sheet.
 
-The app checks the remote list before submission and shows confirmation only after a successful POST response. A failed or uncertain POST remains pending on the device. Refresh checks for a completed write before retrying. For race-proof duplicate prevention across simultaneous devices, deploy the supplied Apps Script or confirm that your current backend uses a script lock and checks the phone inside that lock.
+The app reuses live list data up to 30 seconds old, or checks the remote list before submission and shows confirmation only after a successful POST response. A failed or uncertain POST remains pending on the device. Refresh checks for a completed write before retrying. For race-proof duplicate prevention across simultaneous devices, deploy the supplied Apps Script or confirm that your current backend uses a script lock and checks the phone inside that lock.
 
-WhatsApp opens after a successful save. Some browsers block new windows after network requests; a visible “Send to organiser on WhatsApp” link is always provided. Opening a message does not send it automatically.
+Submission shows an original Lottie progress animation immediately. A successful save shows a Welcome to the trip dialog with an optional WhatsApp share link. WhatsApp never opens automatically; opening a message does not send it. The bundled Lottie Web light player is MIT licensed; see dist/vendor/lottie-LICENSE.md.
 
 ## Deploy or replace the Apps Script
 

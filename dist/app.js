@@ -24,18 +24,67 @@ $('#edit-phone').onclick=()=>{$('#duplicate-dialog').close();$('#phone').focus()
 function renderList(){const all=records.filter(isValidRecord),members=all.flatMap(r=>r.members),adults=members.filter(m=>m.type==='adult').length;$('#count').textContent=members.length;$('#stats').innerHTML=[['Families',all.length],['Total',members.length],['Adults',adults],['Kids',members.length-adults]].map(([k,v])=>`<div class="metric"><strong>${v}</strong><span>${k}</span></div>`).join('');const query=$('#search').value.toLowerCase().trim(),shown=all.filter(r=>[r.familyHead,r.phone,r.ticketId,...r.members.map(m=>m.name)].join(' ').toLowerCase().includes(query));$('#joined-list').innerHTML=shown.length?shown.slice().reverse().map(r=>`<article class="card family-card"><div class="family-top"><span class="avatar">${escapeHtml(Array.from(r.familyHead)[0]?.toUpperCase()||'F')}</span><div><h3>${escapeHtml(r.familyHead)}</h3><p>+91 ${escapeHtml(r.phone)} · ${r.members.length} members</p></div><span class="ticket">${escapeHtml(r.ticketId)}</span></div><div class="chips">${r.members.map(m=>`<span class="chip ${m.type==='adult'?'':m.type==='kidBelow8'?'young':'kid'}">${escapeHtml(m.name)} · ${labels[m.type]||'Kid'}</span>`).join('')}</div><div class="family-bottom">${r.pending?'◷ Saved on this device · Waiting to sync':'✓ Confirmed'}${r.timestamp?' · '+escapeHtml(r.timestamp):''}</div></article>`).join(''):`<div class="card empty"><div class="empty-symbol">♧</div><h3>${query?'No matching families':'The first memory starts here.'}</h3><p>${query?'Try another name, phone number or ticket ID.':'Be the first to bring your people along.'}</p><button class="primary" id="empty-action">${query?'Clear search':'രജിസ്റ്റർ ചെയ്യുക · Register now'}</button></div>`;$('#empty-action')?.addEventListener('click',()=>{if(query){$('#search').value='';renderList();}else switchTab(false,true);});}
 $('#search').addEventListener('input',renderList);
 const network=window.createTripNetwork(API);
-let hasLiveSnapshot=false;
+let hasLiveSnapshot=false,lastLiveRead=0;
 async function getRemote(){return (await network.read()).map(normalize).filter(isValidRecord);}
-function mergeRemote(remote){hasLiveSnapshot=true;const pending=records.filter(r=>r.pending&&!remote.some(s=>s.phone===r.phone));records=[...remote,...pending];persist();renderList();validate();}
+function mergeRemote(remote){hasLiveSnapshot=true;lastLiveRead=Date.now();const pending=records.filter(r=>r.pending&&!remote.some(s=>s.phone===r.phone));records=[...remote,...pending];persist();renderList();validate();}
 function payload(r){const adultCount=r.members.filter(m=>m.type==='adult').length,kid8to15Count=r.members.filter(m=>m.type==='kid8to15').length,kidBelow8Count=r.members.filter(m=>m.type==='kidBelow8').length;return {...r,totalCount:r.members.length,adultCount,kid8to15Count,kidBelow8Count,membersList:r.members,membersSummary:r.members.map((m,i)=>`${i+1}. ${m.name} (${labels[m.type]})`).join('\n')};}
-async function post(r){const result=await network.write(payload(r));if(result.status==='duplicate'||result.code==='DUPLICATE')return {duplicate:true};if(result.status!=='success'&&result.success!==true)throw Error(result.message||'Registration sync could not be confirmed');return result;}
+async function post(r){const result=await network.write(payload(r));if(result.status==='duplicate'||result.code==='DUPLICATE')return {duplicate:true,data:result.data};if(result.status!=='success'&&result.success!==true)throw Error(result.message||'Registration sync could not be confirmed');return result;}
 async function sync(retry=false){if(syncing||saving)return;syncing=true;$('#refresh').disabled=true;$('#sync-status').textContent='Refreshing…';$('#sync-status').classList.remove('live');if(!hasLiveSnapshot&&!records.length){$('#joined-list').innerHTML='<div class="card empty" role="status">Loading families from Google Sheets…</div>';}try{mergeRemote(await getRemote());if(retry&&records.some(r=>r.pending)){for(const r of records.filter(r=>r.pending)){await post(r);}mergeRemote(await getRemote());}const pending=records.some(r=>r.pending);$('#sync-status').textContent=pending?'Waiting to sync':'Live sync';$('#sync-status').classList.toggle('live',!pending);$('#list-message').textContent='Updated from Google Sheets · '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});}catch{$('#sync-status').textContent='Could not refresh · cached data';$('#list-message').textContent='Could not refresh the family list. Your saved entries are still here. Tap Refresh to try again.';if(!hasLiveSnapshot&&!records.length){$('#joined-list').innerHTML='<div class="card empty">The family list could not be loaded. Tap Refresh to try again.</div>';}}finally{syncing=false;$('#refresh').disabled=false;}}
 $('#refresh').onclick=()=>sync(true);
 function whatsapp(r){const text=`🌴 *കാട്ടിലെ കുട്ടികൾ COUSINS TRIP 2026* 🌴\n--------------------------------\n*ആകെ അംഗങ്ങൾ (Total):* ${r.members.length}\n*Phone:* ${r.phone}\n\n*അംഗങ്ങളുടെ വിവരങ്ങൾ (Members List):*\n${r.members.map((m,i)=>`${i+1}. *${m.name}* - ${labels[m.type]}`).join('\n')}\n\n*Status:* Confirmed (രജിസ്ട്രേഷൻ പൂർത്തിയായി) ✅`;const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);return (mobile?'whatsapp://send?phone=919946290209&text=':'https://web.whatsapp.com/send?phone=919946290209&text=')+encodeURIComponent(text);}
 function notify(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('#toast').hidden=true,7000);}
 function confetti(){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;for(let i=0;i<64;i++){const c=document.createElement('i');c.className='confetti';const left=i%2===0;c.style.left=left?'0':'100%';c.style.top='65%';c.style.background=['#62edb1','#0bbad4','#e7c372','#edf9ef'][i%4];c.style.setProperty('--dx',`${(left?1:-1)*(80+Math.random()*innerWidth*.55)}px`);c.style.setProperty('--dy',`${-400+Math.random()*650}px`);document.body.append(c);setTimeout(()=>c.remove(),2000);}}
-$('#registration').addEventListener('submit',async e=>{e.preventDefault();if(!validate())return;const phone=normalizePhone($('#phone').value),existing=duplicate(phone);if(existing){showDuplicate(existing);return;}saving=true;validate();let remote;try{remote=await getRemote();mergeRemote(remote);}catch{saving=false;validate();notify('Google Sheets is not responding right now. Your form is unchanged. Please try again shortly.');play('error');return;}const found=duplicate(phone);if(found){saving=false;validate();showDuplicate(found);return;}const members=formMembers(),r={ticketId:'CK-'+crypto.randomUUID().slice(0,8).toUpperCase(),familyHead:members[0].name,phone,members,timestamp:new Date().toLocaleString('en-IN'),pending:true};records.push(r);persist();renderList();switchTab(true);$('#sync-status').textContent='Saving your family…';// Save is authoritative before opening a confirmation message.
-try{const result=await post(r);if(result.duplicate){mergeRemote(await getRemote());showDuplicate(duplicate(phone)||r);return;}r.pending=false;if(result.ticketId)r.ticketId=String(result.ticketId);if(result.timestamp)r.timestamp=String(result.timestamp);persist();renderList();$('#sync-status').textContent='Live sync';$('#sync-status').classList.add('live');play('celebrate');confetti();notify('You’re on the list! Opening WhatsApp for the organiser.');$('#members').replaceChildren();addMember(false);$('#phone').value='';const url=whatsapp(r);const opened=window.open(url,'_blank');if(!opened){notify('Registered! Tap “Send to organiser” below to open WhatsApp.');}$('#list-message').replaceChildren();const link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener';link.className='quiet-button';link.style.cssText='display:inline-block;color:#9bf0c9;text-decoration:none;margin-top:12px';link.textContent='Send to organiser on WhatsApp';$('#list-message').append(link);sync(false);}catch{notify('Saved on this device. Confirmation is pending; tap Refresh to retry.');$('#sync-status').textContent='Waiting to sync';renderList();}finally{saving=false;validate();sync(false);}});
+let tripAnimation,progressTimer;
+function showProgress(){
+  const dialog=$('#trip-dialog');
+  $('#trip-close').hidden=true;$('#trip-actions').hidden=true;$('#trip-details').hidden=true;$('#trip-success').hidden=true;$('#trip-progress').hidden=false;$('#trip-wait-note').hidden=false;
+  $('#trip-kicker').textContent='A NEW MEMORY BEGINS';$('#trip-dialog-title').textContent='Saving your spot…';$('#trip-dialog-description').textContent='നിങ്ങളുടെ രജിസ്ട്രേഷൻ പൂർത്തിയാക്കുന്നു.';
+  dialog.setAttribute('aria-busy','true');dialog.showModal();$('#trip-dialog-title').focus();
+  if(window.lottie&&!tripAnimation){try{tripAnimation=window.lottie.loadAnimation({container:$('#trip-lottie'),renderer:'svg',loop:true,autoplay:false,animationData:window.TRIP_PROGRESS_ANIMATION});}catch{}}
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches)tripAnimation?.play();
+  progressTimer=setTimeout(()=>{$('#trip-dialog-description').textContent='Google Sheets is taking a little longer. We’re still saving your family…';},8000);
+}
+function endProgress(){clearTimeout(progressTimer);tripAnimation?.pause();$('#trip-dialog').removeAttribute('aria-busy');}
+function showWelcome(r){
+  endProgress();$('#trip-progress').hidden=true;$('#trip-success').hidden=false;$('#trip-kicker').textContent='YOU’RE ON THE LIST';
+  $('#trip-dialog-title').textContent='Welcome to the trip!';$('#trip-dialog-description').textContent=`${r.familyHead}, your family is registered. ഒരുമിച്ച് ഓർമ്മകൾ ഉണ്ടാക്കാം!`;
+  $('#trip-details').textContent=`${r.members.length} members · ${r.ticketId}`;$('#trip-details').hidden=false;
+  $('#trip-whatsapp').href=whatsapp(r);$('#trip-actions').hidden=false;$('#trip-close').hidden=false;$('#trip-wait-note').hidden=true;$('#trip-dialog-title').focus();
+}
+$('#trip-dialog').addEventListener('cancel',e=>{if(saving)e.preventDefault();});
+$('#trip-dialog').addEventListener('close',endProgress);
+$('#trip-close').onclick=$('#trip-done').onclick=()=>{$('#trip-dialog').close();switchTab(true,true);};
+$('#registration').addEventListener('submit',async e=>{
+  e.preventDefault();if(saving||!validate())return;
+  const phone=normalizePhone($('#phone').value),existing=duplicate(phone);
+  if(existing){showDuplicate(existing);return;}
+  const members=formMembers();let r,writeStarted=false;
+  saving=true;validate();showProgress();
+  try{
+    // The page already refreshes every 30 seconds. Reuse that live snapshot.
+    if(!hasLiveSnapshot||Date.now()-lastLiveRead>30000){mergeRemote(await getRemote());}
+    const found=duplicate(phone);
+    if(found){endProgress();$('#trip-dialog').close();showDuplicate(found);return;}
+    r={ticketId:'CK-'+crypto.randomUUID().slice(0,8).toUpperCase(),familyHead:members[0].name,phone,members,timestamp:new Date().toLocaleString('en-IN'),pending:true};
+    records.push(r);persist();writeStarted=true;
+    const result=await post(r);
+    if(result.duplicate){
+      records=records.filter(item=>item!==r);persist();
+      let prior=result.data?normalize(result.data):null;
+      if(!prior){mergeRemote(await getRemote());prior=duplicate(phone);}
+      endProgress();$('#trip-dialog').close();showDuplicate(prior||r);return;
+    }
+    r.pending=false;if(result.ticketId)r.ticketId=String(result.ticketId);if(result.timestamp)r.timestamp=String(result.timestamp);
+    // A background read might have finished while this write was in flight.
+    records=records.filter(item=>item.phone!==phone);records.push(r);persist();renderList();switchTab(true);
+    $('#sync-status').textContent='Live sync';$('#sync-status').classList.add('live');
+    $('#members').replaceChildren();addMember(false);$('#phone').value='';showWelcome(r);play('celebrate');confetti();
+  }catch{
+    endProgress();$('#trip-dialog').close();play('error');
+    if(writeStarted){notify('Saved on this device. Confirmation is pending; tap Refresh to check before retrying.');switchTab(true);$('#sync-status').textContent='Waiting to sync';}
+    else notify('Google Sheets is not responding right now. Your form is unchanged. Please try again shortly.');
+  }finally{saving=false;validate();}
+});
 addMember(false);renderList();sync(true);setInterval(()=>{if(!document.hidden)sync(false);},30000);window.addEventListener('online',()=>sync(true));document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync(false);});window.addEventListener('pageshow',event=>{if(event.persisted)sync(false);});window.addEventListener('storage',e=>{if(e.key===KEY){records=readCache();renderList();validate();}});
 // Quiet, low-density ambient fireflies. Paused while hidden or reduced motion is preferred.
 const canvas=$('#fireflies'),ctx=canvas.getContext('2d'),motion=matchMedia('(prefers-reduced-motion: reduce)');let particles=[],last=0;
