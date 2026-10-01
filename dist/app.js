@@ -36,7 +36,7 @@ function notify(message){$('#toast').textContent=message;$('#toast').hidden=fals
 function confetti(){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;for(let i=0;i<64;i++){const c=document.createElement('i');c.className='confetti';const left=i%2===0;c.style.left=left?'0':'100%';c.style.top='65%';c.style.background=['#62edb1','#0bbad4','#e7c372','#edf9ef'][i%4];c.style.setProperty('--dx',`${(left?1:-1)*(80+Math.random()*innerWidth*.55)}px`);c.style.setProperty('--dy',`${-400+Math.random()*650}px`);document.body.append(c);setTimeout(()=>c.remove(),2000);}}
 let tripAnimation,progressTimer;
 function showProgress(){
-  const dialog=$('#trip-dialog');
+  const dialog=$('#trip-dialog');dialog.classList.remove('is-ticket');$('#ticket-brand').hidden=true;
   $('#trip-close').hidden=true;$('#trip-actions').hidden=true;$('#trip-details').hidden=true;$('#trip-success').hidden=true;$('#trip-progress').hidden=false;$('#trip-wait-note').hidden=false;
   $('#trip-kicker').textContent='A NEW MEMORY BEGINS';$('#trip-dialog-title').textContent='Saving your spot…';$('#trip-dialog-description').textContent='നിങ്ങളുടെ രജിസ്ട്രേഷൻ പൂർത്തിയാക്കുന്നു.';
   dialog.setAttribute('aria-busy','true');dialog.showModal();$('#trip-dialog-title').focus();
@@ -46,9 +46,10 @@ function showProgress(){
 }
 function endProgress(){clearTimeout(progressTimer);tripAnimation?.pause();$('#trip-dialog').removeAttribute('aria-busy');}
 function showWelcome(r){
-  endProgress();$('#trip-progress').hidden=true;$('#trip-success').hidden=false;$('#trip-kicker').textContent='YOU’RE ON THE LIST';
-  $('#trip-dialog-title').textContent='Welcome to the trip!';$('#trip-dialog-description').textContent=`${r.familyHead}, your family is registered. ഒരുമിച്ച് ഓർമ്മകൾ ഉണ്ടാക്കാം!`;
-  $('#trip-details').textContent=`${r.members.length} members · ${r.ticketId}`;$('#trip-details').hidden=false;
+  endProgress();$('#trip-dialog').classList.add('is-ticket');$('#ticket-brand').hidden=false;$('#trip-progress').hidden=true;$('#trip-success').hidden=false;$('#trip-kicker').textContent='REGISTRATION CONFIRMED';
+  $('#trip-dialog-title').textContent='Welcome to the trip!';$('#trip-dialog-description').textContent='ഒരുമിച്ച് ഒരു യാത്ര. ഒരുപാട് ഓർമ്മകൾ.';
+  const adults=r.members.filter(m=>m.type==='adult').length;
+  $('#trip-details').innerHTML=`<div class="ticket-holder"><span class="ticket-label">FAMILY / കുടുംബം</span><strong>${escapeHtml(r.familyHead)}</strong></div><div class="ticket-grid"><div><span class="ticket-label">TRAVELLERS</span><strong>${String(r.members.length).padStart(2,'0')} <small>members</small></strong></div><div><span class="ticket-label">YOUR GROUP</span><strong>${adults} <small>adults</small> · ${r.members.length-adults} <small>kids</small></strong></div></div><div class="ticket-stub"><div><span class="ticket-label">TICKET NUMBER</span><strong>${escapeHtml(r.ticketId)}</strong></div><span class="ticket-confirmed">✓ Confirmed</span></div>`;$('#trip-details').hidden=false;
   $('#trip-whatsapp').href=whatsapp(r);$('#trip-actions').hidden=false;$('#trip-close').hidden=false;$('#trip-wait-note').hidden=true;$('#trip-dialog-title').focus();
 }
 $('#trip-dialog').addEventListener('cancel',e=>{if(saving)e.preventDefault();});
