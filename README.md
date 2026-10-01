@@ -7,7 +7,7 @@ A mobile-first, bilingual registration app built with HTML, CSS and JavaScript. 
 - Family member cards, three age groups, required mobile number and adult validation.
 - Live Google Sheets list, 30-second refresh, counts, search, local cache and pending-save recovery.
 - Duplicate-number dialog, accessible tabs, keyboard controls, reduced-motion support.
-- Sound toggle, quiet fireflies, celebration confetti and organiser WhatsApp link.
+- Sound toggle, quiet fireflies, celebration confetti and downloadable PDF trip pass.
 - Standalone Apps Script backend with locked duplicate checking and server-side validation.
 
 ## Existing backend
@@ -16,7 +16,7 @@ The supplied endpoint was verified to return `status: success` and registrations
 
 The app reuses live list data up to 30 seconds old, or checks the remote list before submission and shows confirmation only after a successful POST response. A failed or uncertain POST remains pending on the device. Refresh checks for a completed write before retrying. For race-proof duplicate prevention across simultaneous devices, deploy the supplied Apps Script or confirm that your current backend uses a script lock and checks the phone inside that lock.
 
-Submission shows an original Lottie progress animation immediately. A successful save shows a Welcome to the trip dialog with an optional WhatsApp share link. WhatsApp never opens automatically; opening a message does not send it. The bundled Lottie Web light player is MIT licensed; see dist/vendor/lottie-LICENSE.md.
+Submission shows an original Lottie progress animation immediately. A successful save shows a Welcome to the trip ticket with a Download Ticket button. The PDF is generated locally from the confirmed registration and contains only the pass artwork and ticket details. There are no WhatsApp controls or sharing links. Malayalam text is rendered using browser font shaping into a high-resolution pass image embedded in the PDF. The bundled Lottie Web light player is MIT licensed; see dist/vendor/lottie-LICENSE.md. PDF generation uses MIT-licensed jsPDF; see dist/vendor/jspdf-LICENSE.
 
 ## Deploy or replace the Apps Script
 
