@@ -1,5 +1,7 @@
 'use strict';
 (() => {
+  const acceptanceKey='cousins-trip-notice-accepted';
+  try { if(localStorage.getItem(acceptanceKey)==='true')return; } catch {}
   const dialog=document.getElementById('opening-notice');
   const agree=document.getElementById('notice-agree');
   let animation,accepted=false;
@@ -12,6 +14,7 @@
   dialog.addEventListener('close',()=>{if(!accepted)dialog.showModal();});
   agree.addEventListener('click',()=>{
     accepted=true;
+    try { localStorage.setItem(acceptanceKey,'true'); } catch {}
     animation?.destroy();
     dialog.close();
     document.documentElement.classList.remove('notice-open');
