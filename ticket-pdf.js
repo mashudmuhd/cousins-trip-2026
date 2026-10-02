@@ -8,7 +8,17 @@ window.createTicketPDF = async function createTicketPDF(registration) {
   const font=(size,weight=400)=>`${weight} ${size}px Inter, "Noto Sans Malayalam", sans-serif`;
   const wrap=(text,width,size,weight=400)=>{ctx.font=font(size,weight);const words=String(text).split(/\s+/),lines=[];let line='';for(const word of words){if(ctx.measureText(line?line+' '+word:word).width<=width){line=line?line+' '+word:word;continue;}if(line)lines.push(line);line='';const segments=typeof Intl.Segmenter==='function'?[...new Intl.Segmenter('ml',{granularity:'grapheme'}).segment(word)].map(x=>x.segment):Array.from(word);for(const char of segments){if(ctx.measureText(line+char).width>width&&line){lines.push(line);line='';}line+=char;}}if(line)lines.push(line);return lines;};
   const names=wrap(family,456,32,700),ids=wrap(ticket,290,21,600);
-  const extra=(names.length-1)*46+(ids.length-1)*28,W=600,H=840+extra,scale=2.5;
+  const chips=[];let chipX=0,chipY=0,rowHeight=0;
+  for(const member of registration.members){
+    const lines=wrap(String(member.name||''),458,15,500);
+    ctx.font=font(15,500);
+    const width=Math.min(490,Math.max(72,...lines.map(line=>ctx.measureText(line).width+30)));
+    const height=lines.length*24+18;
+    if(chipX&&chipX+width>490){chipY+=rowHeight+10;chipX=0;rowHeight=0;}
+    chips.push({lines,x:chipX,y:chipY,width,height});chipX+=width+10;rowHeight=Math.max(rowHeight,height);
+  }
+  const chipSectionHeight=42+chipY+rowHeight+24;
+  const extra=(names.length-1)*46+(ids.length-1)*28,W=600,H=840+extra+chipSectionHeight,scale=Math.min(2.5,14000/H,Math.sqrt(16000000/(W*H)));
   canvas.width=W*scale;canvas.height=H*scale;ctx.scale(scale,scale);
   const ink='#123c2b',muted='#5e7e6b',green='#157d4d';
   function text(str,x,y,size=16,weight=400,color=ink){ctx.font=font(size,weight);ctx.fillStyle=color;ctx.fillText(str,x,y);}
@@ -29,7 +39,14 @@ window.createTicketPDF = async function createTicketPDF(registration) {
   label('TRAVELLERS',55,y);label('YOUR GROUP',312,y);
   text(String(count).padStart(2,'0'),55,y+41,33,700);text(count===1?'member':'members',108,y+39,13,400,muted);
   text(`${adults} ${adults===1?'adult':'adults'}  ·  ${kids} ${kids===1?'kid':'kids'}`,312,y+38,19,600);
-  const perforation=y+76;
+  label('MEMBERS / അംഗങ്ങൾ',55,y+88);
+  for(const chip of chips){
+    const x=55+chip.x,top=y+104+chip.y;
+    ctx.fillStyle='#d6eadf';ctx.strokeStyle='#a9cdb8';ctx.lineWidth=.8;
+    ctx.beginPath();ctx.roundRect(x,top,chip.width,chip.height,13);ctx.fill();ctx.stroke();
+    chip.lines.forEach((name,i)=>text(name,x+15,top+27+i*24,15,500,ink));
+  }
+  const perforation=y+76+chipSectionHeight;
   ctx.fillStyle='#dcece2';ctx.fillRect(25,perforation,W-50,123+(ids.length-1)*28);
   ctx.beginPath();ctx.strokeStyle='#aacbb7';ctx.lineWidth=2;ctx.setLineDash([5,5]);ctx.moveTo(25,perforation);ctx.lineTo(W-25,perforation);ctx.stroke();ctx.setLineDash([]);
   ctx.fillStyle='#f9fcfa';for(const x of [24,W-24]){ctx.beginPath();ctx.arc(x,perforation,11,0,Math.PI*2);ctx.fill();}
