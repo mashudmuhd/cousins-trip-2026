@@ -377,14 +377,14 @@ function renderBudget() {
     if (b.travel > 0) {
       $('#display-travel').textContent = '₹' + b.travel.toLocaleString('en-IN');
     } else {
-      $('#display-travel').innerHTML = '<span class="cat-pill-soon">Update soon</span>';
+      $('#display-travel').innerHTML = '<span class="cat-pill-soon">Will update soon</span>';
     }
   }
   if ($('#display-dinner')) {
     if (b.dinner > 0) {
       $('#display-dinner').textContent = '₹' + b.dinner.toLocaleString('en-IN');
     } else {
-      $('#display-dinner').innerHTML = '<span class="cat-pill-soon">Update soon</span>';
+      $('#display-dinner').innerHTML = '<span class="cat-pill-soon">Will update soon</span>';
     }
   }
 
