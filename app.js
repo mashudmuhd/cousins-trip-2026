@@ -304,8 +304,11 @@ function computeBudget(cfg, allRecords) {
   return {
     cfg,
     resort: totalResort,
+    adultResortRate,
     travel: travelTotal,
+    travelPerAdult, travelPerKid,
     dinner: dinnerTotal,
+    dinnerPerAdult, dinnerPerKid,
     other: otherTotal,
     totalExpense,
     totalFamilies: valid.length,
@@ -370,21 +373,87 @@ function renderBudget() {
   // Update Trip Budget Overview Card
   if ($('#display-total-budget')) $('#display-total-budget').textContent = '₹' + b.totalExpense.toLocaleString('en-IN');
   if ($('#display-resort')) $('#display-resort').textContent = '₹' + b.resort.toLocaleString('en-IN');
-  if ($('#display-travel')) $('#display-travel').textContent = '₹' + b.travel.toLocaleString('en-IN');
-  if ($('#display-dinner')) $('#display-dinner').textContent = '₹' + b.dinner.toLocaleString('en-IN');
-
-  // Hide 0 items to keep card clean
-  if ($('#display-travel-wrap')) $('#display-travel-wrap').hidden = !b.travel;
-  if ($('#display-dinner-wrap')) $('#display-dinner-wrap').hidden = !b.dinner;
-  if ($('#display-other-wrap')) {
-    $('#display-other-wrap').hidden = !b.other;
-    if (b.other && $('#display-other')) $('#display-other').textContent = '₹' + b.other.toLocaleString('en-IN');
+  if ($('#display-travel')) {
+    if (b.travel > 0) {
+      $('#display-travel').textContent = '₹' + b.travel.toLocaleString('en-IN');
+    } else {
+      $('#display-travel').innerHTML = '<span class="cat-pill-soon">Coming soon</span>';
+    }
+  }
+  if ($('#display-dinner')) {
+    if (b.dinner > 0) {
+      $('#display-dinner').textContent = '₹' + b.dinner.toLocaleString('en-IN');
+    } else {
+      $('#display-dinner').innerHTML = '<span class="cat-pill-soon">Coming soon</span>';
+    }
   }
 
-  // Rate displays in overview card
-  if ($('#display-rate-adult')) $('#display-rate-adult').textContent = '₹' + b.adultRate.toLocaleString('en-IN');
+  // Handle travel upcoming vs configured panel
+  const travelUpcoming = $('#travel-upcoming-box'), travelConfigured = $('#travel-configured-box');
+  if (travelUpcoming && travelConfigured) {
+    if (b.travel > 0) {
+      travelUpcoming.hidden = true;
+      travelConfigured.hidden = false;
+      travelConfigured.innerHTML = `
+        <div class="rates-banner">
+          <div class="rate-box">
+            <span class="rate-label">മുതിർന്നവർ (Adult 12+)</span>
+            <strong class="rate-val">₹${b.travelPerAdult.toLocaleString('en-IN')}</strong>
+            <small>${b.totalAdults} members</small>
+          </div>
+          <div class="rate-box">
+            <span class="rate-label">കുട്ടികൾ (Amna &amp; Faizan)</span>
+            <strong class="rate-val">₹${b.travelPerKid.toLocaleString('en-IN')}</strong>
+            <small>${b.totalKids} kids</small>
+          </div>
+          <div class="rate-box">
+            <span class="rate-label">കുട്ടികൾ (&lt;6 Yrs)</span>
+            <strong class="rate-val">Free</strong>
+            <small>${b.totalKidsBelow8} kids</small>
+          </div>
+        </div>
+      `;
+    } else {
+      travelUpcoming.hidden = false;
+      travelConfigured.hidden = true;
+    }
+  }
+
+  // Handle food upcoming vs configured panel
+  const foodUpcoming = $('#food-upcoming-box'), foodConfigured = $('#food-configured-box');
+  if (foodUpcoming && foodConfigured) {
+    if (b.dinner > 0) {
+      foodUpcoming.hidden = true;
+      foodConfigured.hidden = false;
+      foodConfigured.innerHTML = `
+        <div class="rates-banner">
+          <div class="rate-box">
+            <span class="rate-label">മുതിർന്നവർ (Adult 12+)</span>
+            <strong class="rate-val">₹${b.dinnerPerAdult.toLocaleString('en-IN')}</strong>
+            <small>${b.totalAdults} members</small>
+          </div>
+          <div class="rate-box">
+            <span class="rate-label">കുട്ടികൾ (Amna &amp; Faizan)</span>
+            <strong class="rate-val">₹${b.dinnerPerKid.toLocaleString('en-IN')}</strong>
+            <small>${b.totalKids} kids</small>
+          </div>
+          <div class="rate-box">
+            <span class="rate-label">കുട്ടികൾ (&lt;6 Yrs)</span>
+            <strong class="rate-val">Free</strong>
+            <small>${b.totalKidsBelow8} kids</small>
+          </div>
+        </div>
+      `;
+    } else {
+      foodUpcoming.hidden = false;
+      foodConfigured.hidden = true;
+    }
+  }
+
+  // Rate displays in Resort overview
+  if ($('#display-rate-adult')) $('#display-rate-adult').textContent = '₹' + b.adultResortRate.toLocaleString('en-IN');
   if ($('#display-count-adult')) $('#display-count-adult').textContent = b.totalAdults + ' members';
-  if ($('#display-rate-kid')) $('#display-rate-kid').textContent = '₹' + b.kidRate.toLocaleString('en-IN');
+  if ($('#display-rate-kid')) $('#display-rate-kid').textContent = '₹' + (budgetConfig.rateKid ?? 500).toLocaleString('en-IN');
   if ($('#display-count-kid')) $('#display-count-kid').textContent = b.totalKids + ' kids (Amna & Faizan)';
   if ($('#display-rate-kid-below8')) $('#display-rate-kid-below8').textContent = 'Free';
   if ($('#display-count-kid-below8')) $('#display-count-kid-below8').textContent = b.totalKidsBelow8 + ' kids (<6)';
@@ -502,7 +571,27 @@ $('#budget-other')?.addEventListener('input', e => {
   renderBudget();
 });
 
+let activeBudgetCat = 'resort';
+function switchBudgetCat(cat) {
+  activeBudgetCat = cat;
+  document.querySelectorAll('.budget-cat-btn').forEach(btn => {
+    const on = btn.dataset.cat === cat;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-selected', String(on));
+    btn.tabIndex = on ? 0 : -1;
+  });
+  document.querySelectorAll('.cat-panel').forEach(p => {
+    p.hidden = p.id !== `cat-panel-${cat}`;
+  });
+  play('click');
+}
+
 document.addEventListener('click', e => {
+  const catBtn = e.target.closest('.budget-cat-btn');
+  if (catBtn && catBtn.dataset.cat) {
+    switchBudgetCat(catBtn.dataset.cat);
+    return;
+  }
   const paidBtn = e.target.closest('[data-paid-phone]');
   if (paidBtn) {
     togglePaid(paidBtn.dataset.paidPhone);
